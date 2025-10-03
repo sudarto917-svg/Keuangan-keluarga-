@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dompet Ceria - Pengelola Keuangan Keluarga</title>
+    
+    <!-- Dependencies -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    
+    <!-- Custom CSS -->
+    <style>
+        :root {
+            --bg-primary: #F7F9FC; --bg-secondary: #FFFFFF; --border-color: #E0E7FF;
+            --accent-primary: #3B82F6; --accent-secondary: #10B981; --accent-tertiary: #F59E0B;
+            --text-primary: #1F2937; --text-secondary: #6B7280; --shadow-color: rgba(59, 130, 246, 0.1);
+        }
+        body { font-family: 'Nunito', sans-serif; background-color: var(--bg-primary); color: var(--text-primary); }
+        .friendly-card { background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 1.5rem; box-shadow: 0 10px 25px -5px var(--shadow-color), 0 8px 10px -6px var(--shadow-color); transition: transform 0.2s ease-in-out; }
+        .friendly-card:hover { transform: translateY(-4px); }
+        .tab-btn.active { background-color: var(--accent-primary); color: white; font-weight: 700; box-shadow: 0 4px 14px 0 rgba(59, 130, 246, 0.39); }
+        .tab-btn:not(.active):hover { background-color: #EFF6FF; color: var(--accent-primary); }
+        .btn-primary { background-color: var(--accent-primary); color: white; transition: all 0.3s ease; box-shadow: 0 4px 14px 0 rgba(59, 130, 246, 0.39); }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 6px 20px 0 rgba(59, 130, 246, 0.45); }
+        .btn-secondary { background-color: var(--accent-secondary); color: white; }
+        .btn-tertiary { background-color: var(--accent-tertiary); color: white; }
+        .btn-danger { background-color: #EF4444; color: white; }
+        .btn-outline { background-color: transparent; border: 1px solid var(--border-color); color: var(--text-secondary); }
+        .btn-outline:hover { background-color: #F7F9FC; }
+        .toast-message { position: fixed; bottom: 20px; left: 50%; transform: translate(-50%, 100%); padding: 12px 24px; background-color: #333; color: white; border-radius: 9999px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); font-weight: 600; opacity: 0; transition: all 0.4s ease-in-out; z-index: 100; }
+        .toast-message.show { transform: translate(-50%, 0); opacity: 1; }
+        .toast-message.success { background-color: var(--accent-secondary); }
+        .toast-message.error { background-color: #EF4444; }
+        .modal-backdrop { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(17, 24, 39, 0.5); z-index: 40; transition: opacity 0.3s ease; }
+        .modal-content { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 50; transition: all 0.3s ease; }
+        .loader { border: 4px solid #f3f3f3; border-radius: 50%; border-top: 4px solid var(--accent-primary); width: 24px; height: 24px; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body class="antialiased min-h-screen p-4 sm:p-6 lg:p-8">
+    
+    <div id="loadingOverlay" class="fixed inset-0 bg-white/80 z-50 flex flex-col items-center justify-center space-y-2">
+        <div class="loader"></div>
+        <p class="text-gray-600 font-semibold">Memuat data dari Google Sheets...</p>
+    </div>
+
+    <div class="max-w-7xl mx-auto">
+        <!-- Header -->
+        <header class="flex flex-col sm:flex-row justify-between items-center mb-8">
+            <div class="flex items-center space-x-3 mb-4 sm:mb-0">
+                <i class="ph-fill ph-house-line text-5xl text-blue-500"></i>
+                <h1 class="text-3xl font-extrabold tracking-tight text-gray-800">Dompet<span class="text-blue-500">Ceria</span></h1>
+            </div>
+            <div id="dateTime" class="text-sm text-gray-500 bg-white px-4 py-2 rounded-full shadow-sm border border-gray-200"></div>
+        </header>
+
+        <main class="grid grid-cols-12 gap-6">
+            <!-- Sidebar -->
+            <aside class="col-span-12 lg:col-span-3">
+                <div class="friendly-card p-6 space-y-4">
+                    <h2 class="text-lg font-bold text-gray-600 mb-4">Menu Utama</h2>
+                    <nav class="space-y-2">
+                        <button onclick="showTab('dashboard')" class="tab-btn w-full flex items-center space-x-3 p-3 rounded-xl transition-all duration-300 active"><i class="ph ph-house text-xl"></i><span>Dasbor</span></button>
+                        <button onclick="showTab('transactions')" class="tab-btn w-full flex items-center space-x-3 p-3 rounded-xl transition-all duration-300"><i class="ph ph-arrows-left-right text-xl"></i><span>Transaksi</span></button>
+                        <button onclick="showTab('budget')" class="tab-btn w-full flex items-center space-x-3 p-3 rounded-xl transition-all duration-300"><i class="ph ph-target text-xl"></i><span>Anggaran</span></button>
+                        <button onclick="showTab('savings')" class="tab-btn w-full flex items-center space-x-3 p-3 rounded-xl transition-all duration-300"><i class="ph ph-piggy-bank text-xl"></i><span>Tabungan</span></button>
+                    </nav>
+                </div>
+            </aside>
+
+            <!-- Main Content -->
+            <section class="col-span-12 lg:col-span-9 space-y-6">
+                <!-- (All other HTML tabs are identical to the previous version) -->
+                 <!-- Dashboard Tab -->
+                <div id="dashboard" class="tab-content space-y-6">
+                    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+                        <div class="friendly-card p-6"><div class="flex justify-between items-start mb-2"><h3 class="font-semibold text-gray-600">Total Saldo</h3><i class="ph-fill ph-wallet text-3xl text-blue-400"></i></div><p id="totalBalance" class="text-3xl font-bold text-blue-500">Rp 0</p></div>
+                        <div class="friendly-card p-6"><div class="flex justify-between items-start mb-2"><h3 class="font-semibold text-gray-600">Pemasukan</h3><i class="ph-fill ph-arrow-circle-down text-3xl text-green-400"></i></div><p id="totalIncome" class="text-3xl font-bold text-green-500">Rp 0</p></div>
+                        <div class="friendly-card p-6"><div class="flex justify-between items-start mb-2"><h3 class="font-semibold text-gray-600">Pengeluaran</h3><i class="ph-fill ph-arrow-circle-up text-3xl text-red-400"></i></div><p id="totalExpense" class="text-3xl font-bold text-red-500">Rp 0</p></div>
+                        <div class="friendly-card p-6"><div class="flex justify-between items-start mb-2"><h3 class="font-semibold text-gray-600">Total Tabungan</h3><i class="ph-fill ph-piggy-bank text-3xl text-amber-400"></i></div><p id="totalSavings" class="text-3xl font-bold text-amber-500">Rp 0</p></div>
+                    </div>
+                    <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                        <div class="friendly-card p-6"><h3 class="font-semibold text-gray-600 mb-4">Ikhtisar Arus Kas</h3><div id="flowChart"></div></div>
+                        <div class="friendly-card p-6"><h3 class="font-semibold text-gray-600 mb-4">Pengeluaran per Kategori</h3><div id="categoryChart"></div></div>
+                    </div>
+                    <div class="friendly-card p-6">
+                        <h3 class="font-semibold text-gray-600 mb-4">Aktivitas Terakhir</h3>
+                        <div class="overflow-x-auto"><table class="w-full text-left"><thead><tr class="border-b-2 border-gray-100"><th class="p-3 font-bold text-gray-500">Tanggal</th><th class="p-3 font-bold text-gray-500">Deskripsi</th><th class="p-3 font-bold text-gray-500">Kategori/Tujuan</th><th class="p-3 font-bold text-gray-500 text-right">Jumlah</th><th class="p-3 font-bold text-gray-500 text-center">Aksi</th></tr></thead><tbody id="recentTransactionsList"></tbody></table></div>
+                    </div>
+                </div>
+                <!-- Transactions Tab -->
+                <div id="transactions" class="tab-content hidden space-y-6">
+                    <div class="friendly-card p-6">
+                        <h2 class="text-2xl font-bold mb-4 text-blue-500">Tambah Aktivitas Keuangan</h2>
+                        <form id="transactionForm" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div><label for="tr-type" class="block text-sm font-medium text-gray-500 mb-1">Tipe</label><select id="tr-type" class="w-full bg-gray-50 border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 transition"><option value="income">Pemasukan</option><option value="expense">Pengeluaran</option><option value="savings">Transfer ke Tabungan</option></select></div>
+                            <div><label for="tr-amount" class="block text-sm font-medium text-gray-500 mb-1">Jumlah (Rp)</label><input type="number" id="tr-amount" placeholder="50000" required class="w-full bg-gray-50 border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 transition"></div>
+                            <div class="md:col-span-2"><label for="tr-description" class="block text-sm font-medium text-gray-500 mb-1">Deskripsi</label><input type="text" id="tr-description" placeholder="Makan siang keluarga" required class="w-full bg-gray-50 border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 transition"></div>
+                            <div id="category-wrapper"><label for="tr-category" class="block text-sm font-medium text-gray-500 mb-1">Kategori</label><select id="tr-category" class="w-full bg-gray-50 border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 transition"></select></div>
+                            <div id="savings-goal-wrapper" class="hidden"><label for="tr-savings-goal" class="block text-sm font-medium text-gray-500 mb-1">Tujuan Tabungan</label><select id="tr-savings-goal" class="w-full bg-gray-50 border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 transition"></select></div>
+                            <div><label for="tr-date" class="block text-sm font-medium text-gray-500 mb-1">Tanggal</label><input type="date" id="tr-date" required class="w-full bg-gray-50 border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 transition"></div>
+                            <div class="md:col-span-2 text-right"><button type="submit" class="btn-primary font-bold py-2 px-6 rounded-lg">Simpan</button></div>
+                        </form>
+                    </div>
+                    <div class="friendly-card p-6">
+                        <h2 class="text-2xl font-bold mb-4 text-blue-500">Riwayat Aktivitas</h2>
+                        <div class="overflow-x-auto"><table class="w-full text-left"><thead><tr class="border-b-2 border-gray-100"><th class="p-3 font-bold text-gray-500">Tanggal</th><th class="p-3 font-bold text-gray-500">Deskripsi</th><th class="p-3 font-bold text-gray-500">Kategori/Tujuan</th><th class="p-3 font-bold text-gray-500 text-right">Jumlah</th><th class="p-3 font-bold text-gray-500 text-center">Aksi</th></tr></thead><tbody id="fullTransactionsList"></tbody></table></div>
+                    </div>
+                </div>
+                <!-- Budget Tab -->
+                <div id="budget" class="tab-content hidden space-y-6">
+                    <div class="friendly-card p-6"><h2 class="text-2xl font-bold mb-4 text-blue-500">Kelola Anggaran Bulanan</h2><div id="budgetList" class="space-y-6"></div></div>
+                    <div class="friendly-card p-6">
+                        <h2 class="text-2xl font-bold mb-4 text-blue-500">Tambah Anggaran Baru</h2>
+                        <form id="addBudgetForm" class="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                            <div class="md:col-span-2"><label for="new-budget-category" class="block text-sm font-medium text-gray-500 mb-1">Nama Kategori</label><input type="text" id="new-budget-category" placeholder="Contoh: Belanja Bulanan" required class="w-full bg-gray-50 border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 transition"></div>
+                            <div><label for="new-budget-amount" class="block text-sm font-medium text-gray-500 mb-1">Jumlah (Rp)</label><input type="number" id="new-budget-amount" placeholder="1000000" required class="w-full bg-gray-50 border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 transition"></div>
+                            <div class="md:col-span-3 text-right"><button type="submit" class="btn-primary font-bold py-2 px-6 rounded-lg"><i class="ph ph-plus-circle"></i> Tambah Anggaran</button></div>
+                        </form>
+                    </div>
+                </div>
+                <!-- SAVINGS Tab -->
+                <div id="savings" class="tab-content hidden space-y-6">
+                    <div class="friendly-card p-6"><h2 class="text-2xl font-bold mb-4 text-amber-500">Tujuan Tabungan Anda</h2><div id="savingsGoalList" class="space-y-6"></div></div>
+                    <div class="friendly-card p-6">
+                        <h2 class="text-2xl font-bold mb-4 text-amber-500">Tambah Tujuan Baru</h2>
+                        <form id="addSavingsGoalForm" class="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                            <div class="md:col-span-2"><label for="new-goal-name" class="block text-sm font-medium text-gray-500 mb-1">Nama Tujuan</label><input type="text" id="new-goal-name" placeholder="Contoh: Dana Darurat" required class="w-full bg-gray-50 border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-amber-500 transition"></div>
+                            <div><label for="new-goal-target" class="block text-sm font-medium text-gray-500 mb-1">Target (Rp)</label><input type="number" id="new-goal-target" placeholder="10000000" required class="w-full bg-gray-50 border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-amber-500 transition"></div>
+                            <div class="md:col-span-3 text-right"><button type="submit" class="btn-tertiary font-bold py-2 px-6 rounded-lg"><i class="ph ph-plus-circle"></i> Tambah Tujuan</button></div>
+                        </form>
+                    </div>
+                </div>
+            </section>
+        </main>
+        
+        <div id="toastMessage" class="toast-message">Pesan</div>
+    </div>
+
+    <!-- Modals -->
+    <div id="editTransactionModal" class="hidden">
+        <div class="modal-backdrop" onclick="closeEditModal()"></div>
+        <div class="modal-content w-full max-w-lg">
+            <div class="friendly-card p-6 sm:p-8">
+                <h2 class="text-2xl font-bold mb-6 text-blue-500">Edit Aktivitas</h2>
+                <form id="editTransactionForm" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <input type="hidden" id="edit-tr-id">
+                    <div><label for="edit-tr-type" class="block text-sm font-medium text-gray-500 mb-1">Tipe</label><select id="edit-tr-type" class="w-full bg-gray-50 border border-gray-300 rounded-lg px-3 py-2" disabled><option value="income">Pemasukan</option><option value="expense">Pengeluaran</option><option value="savings">Transfer ke Tabungan</option></select></div>
+                    <div><label for="edit-tr-amount" class="block text-sm font-medium text-gray-500 mb-1">Jumlah (Rp)</label><input type="number" id="edit-tr-amount" required class="w-full bg-gray-50 border border-gray-300 rounded-lg px-3 py-2"></div>
+                    <div class="md:col-span-2"><label for="edit-tr-description" class="block text-sm font-medium text-gray-500 mb-1">Deskripsi</label><input type="text" id="edit-tr-description" required class="w-full bg-gray-50 border border-gray-300 rounded-lg px-3 py-2"></div>
+                    <div class="md:col-span-2"><label for="edit-tr-category" class="block text-sm font-medium text-gray-500 mb-1">Kategori/Tujuan</label><input type="text" id="edit-tr-category" required class="w-full bg-gray-50 border border-gray-300 rounded-lg px-3 py-2" disabled></div>
+                    <div><label for="edit-tr-date" class="block text-sm font-medium text-gray-500 mb-1">Tanggal</label><input type="date" id="edit-tr-date" required class="w-full bg-gray-50 border border-gray-300 rounded-lg px-3 py-2"></div>
+                    <div class="md:col-span-2 flex justify-end space-x-3 mt-4">
+                        <button type="button" onclick="closeEditModal()" class="btn-outline font-bold py-2 px-6 rounded-lg">Batal</button>
+                        <button type="submit" class="btn-primary font-bold py-2 px-6 rounded-lg">Simpan</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div id="editSavingsGoalModal" class="hidden">
+        <div class="modal-backdrop" onclick="closeEditGoalModal()"></div>
+        <div class="modal-content w-full max-w-lg">
+            <div class="friendly-card p-6 sm:p-8">
+                <h2 class="text-2xl font-bold mb-6 text-amber-500">Edit Tujuan Tabungan</h2>
+                <form id="editSavingsGoalForm" class="space-y-4">
+                    <input type="hidden" id="edit-goal-id">
+                    <div><label for="edit-goal-name" class="block text-sm font-medium text-gray-500 mb-1">Nama Tujuan</label><input type="text" id="edit-goal-name" required class="w-full bg-gray-50 border border-gray-300 rounded-lg px-3 py-2"></div>
+                    <div><label for="edit-goal-target" class="block text-sm font-medium text-gray-500 mb-1">Target (Rp)</label><input type="number" id="edit-goal-target" required class="w-full bg-gray-50 border border-gray-300 rounded-lg px-3 py-2"></div>
+                    <div class="flex justify-end space-x-3 pt-4">
+                        <button type="button" onclick="closeEditGoalModal()" class="btn-outline font-bold py-2 px-6 rounded-lg">Batal</button>
+                        <button type="submit" class="btn-tertiary font-bold py-2 px-6 rounded-lg">Simpan</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+<script>
+    // --- CONFIGURATION ---
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwIAtjce57MnKXVZL07-F0b1P3APcRMdA5yczM1fXj4MzqannQpucAVTO_xZQWIc8tv/exec";
+
+    // --- State Management ---
+    let transactions = [];
+    let budgets = [];
+    let savingsGoals = [];
+    let isSaving = false; // Flag to prevent multiple save operations
+
+    // --- Chart instances ---
+    let flowChartInstance = null;
+    let categoryChartInstance = null;
+
+    // --- Utility Functions ---
+    const formatCurrency = (amount) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(amount);
+    const formatDate = (dateString) => new Date(dateString).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
+    
+    // --- UI & Notifications ---
+    function showToast(message, type = 'info') {
+        const toast = document.getElementById('toastMessage');
+        toast.textContent = message;
+        toast.className = 'toast-message'; // Reset classes
+        if (type === 'success') toast.classList.add('success');
+        if (type === 'error') toast.classList.add('error');
+        toast.classList.add('show');
+        setTimeout(() => { toast.classList.remove('show'); }, 3000);
+    }
+    function showTab(tabId) { document.querySelectorAll('.tab-content').forEach(tab => tab.classList.add('hidden')); document.getElementById(tabId).classList.remove('hidden'); document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active')); document.querySelector(`button[onclick="showTab('${tabId}')"]`).classList.add('active'); }
+    
+    function handleTransactionTypeChange() {
+        const type = document.getElementById('tr-type').value;
+        document.getElementById('category-wrapper').classList.toggle('hidden', type === 'savings');
+        document.getElementById('savings-goal-wrapper').classList.toggle('hidden', type !== 'savings');
+    }
+    
+    // --- ASYNC DATA HANDLING with Google Sheets ---
+    async function saveDataToCloud() {
+        if (isSaving) return; // Don't save if a save is already in progress
+        isSaving = true;
+        showToast("Menyimpan data...");
+        try {
+            const state = { transactions, budgets, savingsGoals };
+            const response = await fetch(SCRIPT_URL, {
+                method: 'POST',
+                body: JSON.stringify(state),
+                headers: { 'Content-Type': 'application/json' },
+                mode: 'no-cors' // Use 'no-cors' because doPost in Apps Script doesn't return a standard CORS response
+            });
+            console.log("Save request sent to Google Sheet.");
+            showToast("Data berhasil disimpan!", "success");
+        } catch (error) {
+            console.error("Error saving to Google Sheet:", error);
+            showToast("Gagal menyimpan data.", "error");
+        } finally {
+            isSaving = false;
+        }
+    }
+
+    // --- Core Logic ---
+    function addTransaction(e) { e.preventDefault(); const type = document.getElementById('tr-type').value; const amount = parseFloat(document.getElementById('tr-amount').value); const description = document.getElementById('tr-description').value; const date = document.getElementById('tr-date').value; let category; if (type === 'savings') { category = document.getElementById('tr-savings-goal').value; if (!category) { alert('Harap pilih tujuan tabungan.'); return; } const goal = savingsGoals.find(g => g.name === category); if (goal) { goal.current += amount; } } else { category = document.getElementById('tr-category').value; } if (!amount || !description || !date || !category) { alert('Harap isi semua kolom.'); return; } transactions.push({ id: Date.now(), type, amount, description, category, date }); document.getElementById('transactionForm').reset(); document.getElementById('tr-date').valueAsDate = new Date(); handleTransactionTypeChange(); renderAndSave(); showToast('Aktivitas berhasil ditambahkan!', 'success'); showTab('dashboard'); }
+    function deleteTransaction(id) { if (!confirm('Apakah Anda yakin ingin menghapus aktivitas ini? Menghapus transfer tabungan akan mengembalikan saldo ke tujuan tersebut.')) return; const transactionIndex = transactions.findIndex(tr => tr.id === id); if (transactionIndex === -1) return; const transaction = transactions[transactionIndex]; if (transaction.type === 'savings') { const goal = savingsGoals.find(g => g.name === transaction.category); if (goal) { goal.current -= transaction.amount; } } transactions.splice(transactionIndex, 1); renderAndSave(); showToast('Aktivitas berhasil dihapus.'); }
+
+    // --- Edit Transaction Modal Logic ---
+    function openEditModal(id) { const transaction = transactions.find(tr => tr.id === id); if (!transaction) return; document.getElementById('edit-tr-id').value = transaction.id; document.getElementById('edit-tr-type').value = transaction.type; document.getElementById('edit-tr-amount').value = transaction.amount; document.getElementById('edit-tr-description').value = transaction.description; document.getElementById('edit-tr-category').value = transaction.category; document.getElementById('edit-tr-date').value = transaction.date; document.getElementById('editTransactionModal').classList.remove('hidden'); }
+    function closeEditModal() { document.getElementById('editTransactionModal').classList.add('hidden'); }
+    function updateTransaction(e) { e.preventDefault(); const id = parseInt(document.getElementById('edit-tr-id').value); const transactionIndex = transactions.findIndex(tr => tr.id === id); if (transactionIndex === -1) return; const oldTransaction = { ...transactions[transactionIndex] }; const newAmount = parseFloat(document.getElementById('edit-tr-amount').value); const amountDifference = newAmount - oldTransaction.amount; if (oldTransaction.type === 'savings') { const goal = savingsGoals.find(g => g.name === oldTransaction.category); if (goal) { goal.current += amountDifference; } } transactions[transactionIndex] = { ...oldTransaction, amount: newAmount, description: document.getElementById('edit-tr-description').value, date: document.getElementById('edit-tr-date').value, }; renderAndSave(); closeEditModal(); showToast('Aktivitas berhasil diperbarui!', 'success'); }
+
+    // --- Savings Goal Logic ---
+    function addSavingsGoal(e) { e.preventDefault(); const nameInput = document.getElementById('new-goal-name'); const targetInput = document.getElementById('new-goal-target'); const name = nameInput.value.trim(); const target = parseFloat(targetInput.value); if (!name || !target) { alert('Harap isi nama dan target tujuan.'); return; } if (savingsGoals.some(g => g.name.toLowerCase() === name.toLowerCase())) { alert('Tujuan tabungan dengan nama ini sudah ada.'); return; } savingsGoals.push({ id: Date.now(), name, target, current: 0 }); nameInput.value = ''; targetInput.value = ''; renderAndSave(); showToast('Tujuan tabungan baru berhasil ditambahkan!', 'success'); }
+    function deleteSavingsGoal(id) { if (!confirm('Yakin ingin menghapus tujuan tabungan ini? Semua transaksi terkait akan tetap tercatat.')) return; savingsGoals = savingsGoals.filter(g => g.id !== id); renderAndSave(); showToast('Tujuan tabungan dihapus.'); }
+    function openEditGoalModal(id) { const goal = savingsGoals.find(g => g.id === id); if (!goal) return; document.getElementById('edit-goal-id').value = goal.id; document.getElementById('edit-goal-name').value = goal.name; document.getElementById('edit-goal-target').value = goal.target; document.getElementById('editSavingsGoalModal').classList.remove('hidden'); }
+    function closeEditGoalModal() { document.getElementById('editSavingsGoalModal').classList.add('hidden'); }
+    function updateSavingsGoal(e) { e.preventDefault(); const id = parseInt(document.getElementById('edit-goal-id').value); const goalIndex = savingsGoals.findIndex(g => g.id === id); if (goalIndex === -1) return; savingsGoals[goalIndex].name = document.getElementById('edit-goal-name').value.trim(); savingsGoals[goalIndex].target = parseFloat(document.getElementById('edit-goal-target').value); renderAndSave(); closeEditGoalModal(); showToast('Tujuan tabungan berhasil diperbarui!', 'success'); }
+
+    // --- Budget Logic ---
+    function addBudget(e) { e.preventDefault(); const catInput = document.getElementById('new-budget-category'), amtInput = document.getElementById('new-budget-amount'), newCategory = catInput.value.trim(), newAmount = parseFloat(amtInput.value); if (!newCategory || !newAmount) { alert('Harap isi nama kategori dan jumlah anggaran.'); return; } if (budgets.some(b => b.category.toLowerCase() === newCategory.toLowerCase())) { alert('Kategori anggaran sudah ada.'); return; } budgets.push({ category: newCategory, allocated: newAmount, spent: 0 }); renderAndSave(); catInput.value = ''; amtInput.value = ''; showToast('Anggaran baru berhasil ditambahkan!', 'success'); }
+    function updateBudget(index) { const inputEl = document.getElementById(`budget-input-${index}`), newAmount = parseFloat(inputEl.value); if (isNaN(newAmount) || newAmount < 0) { alert('Harap masukkan jumlah yang valid.'); return; } budgets[index].allocated = newAmount; renderAndSave(); showToast(`Anggaran "${budgets[index].category}" diperbarui.`); }
+    function deleteBudget(index) { const catToDelete = budgets[index].category; if (confirm(`Apakah Anda yakin ingin menghapus anggaran untuk "${catToDelete}"?`)) { budgets.splice(index, 1); renderAndSave(); showToast(`Anggaran "${catToDelete}" berhasil dihapus.`); } }
+
+    // --- RENDER FUNCTIONS ---
+    function renderSummary() { const totalIncome = transactions.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0); const totalExpense = transactions.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0); const totalBalance = totalIncome - totalExpense; const totalSavings = savingsGoals.reduce((s, g) => s + g.current, 0); document.getElementById('totalBalance').textContent = formatCurrency(totalBalance); document.getElementById('totalIncome').textContent = formatCurrency(totalIncome); document.getElementById('totalExpense').textContent = formatCurrency(totalExpense); document.getElementById('totalSavings').textContent = formatCurrency(totalSavings); }
+    function renderRecentTransactions() { const list = document.getElementById('recentTransactionsList'); list.innerHTML = ''; const recent = [...transactions].sort((a,b) => new Date(b.date) - new Date(a.date)).slice(0, 5); if (recent.length === 0) { list.innerHTML = '<tr><td colspan="5" class="text-center p-4 text-gray-500">Belum ada aktivitas.</td></tr>'; return; } recent.forEach(tr => { const row = document.createElement('tr'); row.className = `border-b border-gray-100 hover:bg-blue-50`; const colorClass = tr.type === 'income' ? 'text-green-500' : tr.type === 'expense' ? 'text-red-500' : 'text-amber-500'; const symbol = tr.type === 'income' ? '+' : '-'; row.innerHTML = `<td class="p-3 text-gray-500">${formatDate(tr.date)}</td><td class="p-3 font-semibold text-gray-700">${tr.description}</td><td class="p-3 text-gray-500">${tr.category}</td><td class="p-3 text-right font-bold ${colorClass}">${symbol} ${formatCurrency(tr.amount)}</td><td class="p-3 text-center space-x-2"><button onclick="openEditModal(${tr.id})" class="text-blue-500 hover:text-blue-700 transition p-1 rounded-full hover:bg-blue-100 text-lg"><i class="ph ph-pencil-simple"></i></button><button onclick="deleteTransaction(${tr.id})" class="text-red-500 hover:text-red-700 transition p-1 rounded-full hover:bg-red-100 text-lg"><i class="ph ph-trash"></i></button></td>`; list.appendChild(row); }); }
+    function renderAllTransactions() { const list = document.getElementById('fullTransactionsList'); list.innerHTML = ''; const allSorted = [...transactions].sort((a, b) => new Date(b.date) - new Date(a.date)); if (allSorted.length === 0) { list.innerHTML = '<tr><td colspan="5" class="text-center p-4 text-gray-500">Belum ada aktivitas.</td></tr>'; return; } allSorted.forEach(tr => { const row = document.createElement('tr'); row.className = `border-b border-gray-100 hover:bg-blue-50`; const colorClass = tr.type === 'income' ? 'text-green-500' : tr.type === 'expense' ? 'text-red-500' : 'text-amber-500'; const symbol = tr.type === 'income' ? '+' : '-'; row.innerHTML = `<td class="p-3 text-gray-500">${formatDate(tr.date)}</td><td class="p-3 font-semibold text-gray-700">${tr.description}</td><td class="p-3 text-gray-500">${tr.category}</td><td class="p-3 text-right font-bold ${colorClass}">${symbol} ${formatCurrency(tr.amount)}</td><td class="p-3 text-center space-x-2"><button onclick="openEditModal(${tr.id})" class="text-blue-500 hover:text-blue-700 transition p-1 rounded-full hover:bg-blue-100 text-lg"><i class="ph ph-pencil-simple"></i></button><button onclick="deleteTransaction(${tr.id})" class="text-red-500 hover:text-red-700 transition p-1 rounded-full hover:bg-red-100 text-lg"><i class="ph ph-trash"></i></button></td>`; list.appendChild(row); }); }
+    function renderBudgets() { budgets.forEach(b => { b.spent = transactions.filter(tr => tr.type === 'expense' && tr.category === b.category).reduce((s, tr) => s + tr.amount, 0); }); const budgetContainer = document.getElementById('budgetList'); budgetContainer.innerHTML = ''; if (budgets.length === 0) { budgetContainer.innerHTML = '<p class="text-center text-gray-500 p-4">Anda belum memiliki anggaran.</p>'; return; } budgets.forEach((b, i) => { const p = b.allocated > 0 ? (b.spent / b.allocated) * 100 : 0; const c = p > 100 ? 'bg-red-500' : (p > 75 ? 'bg-yellow-400' : 'bg-blue-500'); const el = document.createElement('div'); el.className = 'p-4 border border-gray-200 rounded-xl'; el.innerHTML = `<div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center"><div class="md:col-span-1"><h4 class="font-bold text-lg text-gray-800">${b.category}</h4><p class="text-sm text-gray-500">${formatCurrency(b.spent)} / <span class="font-semibold">${formatCurrency(b.allocated)}</span></p></div><div class="md:col-span-2"><div class="w-full bg-gray-200 rounded-full h-2.5 mb-2"><div class="${c} h-2.5 rounded-full" style="width: ${Math.min(p, 100)}%"></div></div><div class="flex items-center gap-2"><input type="number" id="budget-input-${i}" value="${b.allocated}" class="w-full bg-gray-50 border border-gray-300 rounded-lg px-3 py-1 text-sm focus:ring-2 focus:ring-blue-500 transition" placeholder="Ganti nominal"><button onclick="updateBudget(${i})" class="btn-secondary text-xs font-bold py-1.5 px-3 rounded-lg flex-shrink-0">Simpan</button><button onclick="deleteBudget(${i})" class="btn-danger text-xs font-bold py-1.5 px-3 rounded-lg flex-shrink-0"><i class="ph ph-trash"></i></button></div>${p > 100 ? `<p class="text-xs text-red-500 mt-1">Melebihi anggaran sebesar ${formatCurrency(b.spent - b.allocated)}!</p>` : ''}</div></div>`; budgetContainer.appendChild(el); }); }
+    function renderSavingsGoals() { const goalContainer = document.getElementById('savingsGoalList'); goalContainer.innerHTML = ''; if (savingsGoals.length === 0) { goalContainer.innerHTML = '<p class="text-center text-gray-500 p-4">Anda belum punya tujuan tabungan. Yuk, buat satu di bawah!</p>'; return; } savingsGoals.forEach(goal => { const p = goal.target > 0 ? (goal.current / goal.target) * 100 : 0; const el = document.createElement('div'); el.className = 'p-4 border border-amber-200 rounded-xl bg-amber-50/50'; el.innerHTML = `<div class="flex justify-between items-start mb-2"><div class="flex-1"><h4 class="font-bold text-lg text-amber-800">${goal.name}</h4><p class="text-sm text-gray-500">${formatCurrency(goal.current)} / <span class="font-semibold text-gray-700">${formatCurrency(goal.target)}</span></p></div><div class="flex items-center space-x-1"><button onclick="openEditGoalModal(${goal.id})" class="text-blue-500 hover:text-blue-700 p-1"><i class="ph ph-pencil-simple text-lg"></i></button><button onclick="deleteSavingsGoal(${goal.id})" class="text-red-500 hover:text-red-700 p-1"><i class="ph ph-trash text-lg"></i></button></div></div><div class="w-full bg-gray-200 rounded-full h-4 mt-2 border border-gray-300"><div class="bg-amber-400 h-full rounded-full text-center text-white text-xs font-bold" style="width: ${Math.min(p, 100)}%">${p.toFixed(0)}%</div></div>${p >= 100 ? `<p class="text-sm font-bold text-green-600 mt-2 flex items-center gap-1"><i class="ph-fill ph-check-circle"></i> Selamat, target tercapai!</p>` : ''}`; goalContainer.appendChild(el); }); }
+    function populateCategoryOptions() { const catSelect = document.getElementById('tr-category'); catSelect.innerHTML = '<option value="" disabled selected>Pilih Kategori</option>'; const defaultCats = ['Gaji', 'Bonus', 'Lainnya'], expenseCats = budgets.map(b => b.category), allCats = [...new Set([...expenseCats, ...defaultCats])]; allCats.forEach(cat => { const opt = document.createElement('option'); opt.value = cat; opt.textContent = cat; catSelect.appendChild(opt); }); }
+    function populateSavingsGoalOptions() { const goalSelect = document.getElementById('tr-savings-goal'); goalSelect.innerHTML = '<option value="" disabled selected>Pilih Tujuan</option>'; savingsGoals.forEach(g => { const opt = document.createElement('option'); opt.value = g.name; opt.textContent = g.name; goalSelect.appendChild(opt); }); }
+    function renderCharts() { const labels = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des']; const incomeData = Array(12).fill(0); const expenseData = Array(12).fill(0); transactions.forEach(tr => { const month = new Date(tr.date).getMonth(); if (tr.type === 'income') incomeData[month] += tr.amount; else if (tr.type === 'expense') expenseData[month] += tr.amount; }); const expenseByCategory = transactions.filter(t => t.type === 'expense').reduce((acc, t) => { acc[t.category] = (acc[t.category] || 0) + t.amount; return acc; }, {}); const categoryLabels = Object.keys(expenseByCategory); const categoryData = Object.values(expenseByCategory); const friendlyColors = ['#60A5FA', '#34D399', '#FBBF24', '#F87171', '#A78BFA', '#22D3EE']; const flowOptions = { series: [{ name: 'Pemasukan', data: incomeData }, { name: 'Pengeluaran', data: expenseData }], chart: { type: 'bar', height: 300, fontFamily: 'Nunito, sans-serif', toolbar: { show: false } }, colors: ['#10B981', '#EF4444'], plotOptions: { bar: { horizontal: false, columnWidth: '55%', borderRadius: 8 } }, dataLabels: { enabled: false }, stroke: { show: true, width: 2, colors: ['transparent'] }, xaxis: { categories: labels, labels: { style: { colors: '#6B7280' } } }, yaxis: { labels: { style: { colors: '#6B7280' }, formatter: (val) => `Rp ${val/1000}k` } }, fill: { opacity: 1 }, legend: { position: 'top', horizontalAlign: 'right' }, tooltip: { y: { formatter: (val) => formatCurrency(val) } }, grid: { borderColor: '#F7F9FC' } }; if (flowChartInstance) { flowChartInstance.updateOptions(flowOptions); } else { flowChartInstance = new ApexCharts(document.querySelector("#flowChart"), flowOptions); flowChartInstance.render(); } const categoryOptions = { series: categoryData.length > 0 ? categoryData : [1], labels: categoryLabels.length > 0 ? categoryLabels : ['Tidak ada data'], colors: friendlyColors, chart: { type: 'donut', height: 300, fontFamily: 'Nunito, sans-serif' }, plotOptions: { pie: { donut: { labels: { show: true, total: { show: true, label: 'Total', color: '#1F2937', formatter: (w) => formatCurrency(w.globals.seriesTotals.reduce((a, b) => a + b, 0)) } } } } }, dataLabels: { enabled: false }, legend: { position: 'bottom' }, responsive: [{ breakpoint: 480, options: { chart: { width: 250 }, legend: { position: 'bottom' } } }] }; if (categoryChartInstance) { categoryChartInstance.updateOptions(categoryOptions); } else { categoryChartInstance = new ApexCharts(document.querySelector("#categoryChart"), categoryOptions); categoryChartInstance.render(); } }
+
+    // --- Main App Function ---
+    function renderAndSave() {
+        // Render all UI components with current state
+        renderSummary(); renderRecentTransactions(); renderAllTransactions();
+        renderBudgets(); renderSavingsGoals();
+        populateCategoryOptions(); populateSavingsGoalOptions(); renderCharts();
+        
+        // Save the new state to the cloud
+        saveDataToCloud();
+    }
+
+    // --- Event Listeners and Initial Load ---
+    document.addEventListener('DOMContentLoaded', async () => {
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        try {
+            const response = await fetch(SCRIPT_URL);
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            const data = await response.json();
+            
+            transactions = data.transactions || [];
+            budgets = data.budgets || [];
+            savingsGoals = data.savingsGoals || [];
+            
+            showToast("Data berhasil dimuat!", "success");
+        } catch (error) {
+            console.error("Error loading data from Google Sheet:", error);
+            showToast("Gagal memuat data. Mungkin ini penggunaan pertama kali.", "error");
+            // Load default data if loading fails
+            budgets = [ { category: 'Makanan', allocated: 1500000, spent: 0 }, { category: 'Transportasi', allocated: 500000, spent: 0 }, { category: 'Tagihan', allocated: 1000000, spent: 0 }];
+            savingsGoals = [{ id: Date.now(), name: 'Dana Darurat', target: 10000000, current: 0 }];
+        } finally {
+            loadingOverlay.style.display = 'none';
+        }
+
+        // Setup event listeners after data is loaded
+        document.getElementById('transactionForm').addEventListener('submit', addTransaction);
+        document.getElementById('addBudgetForm').addEventListener('submit', addBudget);
+        document.getElementById('editTransactionForm').addEventListener('submit', updateTransaction);
+        document.getElementById('addSavingsGoalForm').addEventListener('submit', addSavingsGoal);
+        document.getElementById('editSavingsGoalForm').addEventListener('submit', updateSavingsGoal);
+        document.getElementById('tr-type').addEventListener('change', handleTransactionTypeChange);
+        
+        document.getElementById('tr-date').valueAsDate = new Date();
+        updateDateTime(); setInterval(updateDateTime, 60000);
+        
+        // Initial Render
+        renderSummary(); renderRecentTransactions(); renderAllTransactions();
+        renderBudgets(); renderSavingsGoals();
+        populateCategoryOptions(); populateSavingsGoalOptions(); renderCharts();
+        showTab('dashboard');
+    });
+    
+    function updateDateTime() { const now = new Date(); const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }; document.getElementById('dateTime').textContent = now.toLocaleDateString('id-ID', options); }
+</script>
+
+</body>
+</html>
+
+
